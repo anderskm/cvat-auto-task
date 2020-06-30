@@ -93,6 +93,10 @@ def main():
                 image_files = [os.path.join(folder, os.path.split(i)[1]).replace('\\','/') for i in image_files]
                 logging.info('Found ' + str(len(image_files)) + ' images')
                 logging.debug(';'.join(image_files))
+
+                if len(image_files) < 1:
+                    logging.warning('\033[1;33m' + 'No images found in folder. Skipping task creation.' +'\033[0m')
+                    continue
                 
                 logging.info('Creating task')
                 task = cvat.create_task(name=folder, labels=labels, segment_size=args.job_size, overlap=args.overlap)
