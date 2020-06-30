@@ -108,9 +108,9 @@ def main():
                     time.sleep(1.0)
                     status = task.status()
                 if status['state'] == 'Failed':
-                    logging.warning('\033[1;33mState: ' + status['state'] + ' Message: ' + status['message']+'\033[0m')
+                    logging.warning('\033[1;33mState: ' + status['state'] + '. Message: ' + status['message']+'\033[0m')
                 else:
-                    logging.info('State: ' + status['state'] + ' Message: ' + status['message'])
+                    logging.info('State: ' + status['state'] + '. Message: ' + status['message'])
 
         logging.info('Done')
 
