@@ -43,7 +43,7 @@ def main():
     else:
         log_level = logging.INFO
 
-    logging.basicConfig(filename='vjd_task_creation.log', format='%(asctime)s[%(levelname)s] %(message)s', datefmt='[%Y.%m.%d %H:%M:%S]', level=log_level)
+    logging.basicConfig(filename='vjd_task_creation.log', format='%(asctime)s[%(levelname)s] %(message)s', datefmt='[%Y.%m.%d %H:%M:%S]', level=logging.DEBUG)
     console = logging.StreamHandler()
     console.setLevel(log_level)
     formatter = logging.Formatter('%(asctime)s[%(levelname)s] %(message)s', datefmt='[%Y.%m.%d %H:%M:%S]')
