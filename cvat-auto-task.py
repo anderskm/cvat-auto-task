@@ -104,7 +104,7 @@ def main():
                 time.sleep(1.0)
                 status = task.status()
                 while status['state'] in ['Queued','Started']:
-                    logging.debug('State: ' + status['state'] + ' Message: ' + status['message'])
+                    logging.info('State: ' + status['state'] + ' Message: ' + status['message'])
                     time.sleep(1.0)
                     status = task.status()
                 if status['state'] == 'Failed':
