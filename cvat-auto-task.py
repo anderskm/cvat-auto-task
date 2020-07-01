@@ -94,7 +94,9 @@ def main():
                     shutil.move(local_task_folder, local_task_folder_new_name)
                     
                     # Delete task on server
+                    logging.info('Deleting task on server...')
                     task.delete()
+                    logging.info(task.name + ' cleaned up.')
 
             logging.info('Retrieving tasks after cleanup...')
             tasks = cvat.get_tasks()
