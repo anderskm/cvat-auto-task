@@ -1,7 +1,13 @@
 import logging
 import requests
+import os
+from enum import Enum
+
 
 class CVATAPI(object):
+
+    class ANNOTATIONS(Enum):
+        CVATImages1_1 = 'CVAT for images 1.1'
 
     def __init__(self, server_host='localhost', server_port='8080', username='', password='', use_https=False):
         self.server_host = server_host
@@ -96,11 +102,12 @@ class task():
             self.size = json['size']
         else:
             self.size = None
+        self.task_status = json['status']
         self._json = json
         self._session = session
 
     def __str__(self):
-        return 'Name: ' + self.name + ', url: ' + self.url
+        return 'Name: ' + self.name + ', status: ' + self.task_status +  ', url: ' + self.url
 
     def add_data(self, client_files=None, remote_files=None, share_files=None, image_quality=80):
         url = self.url + '/data'
@@ -134,13 +141,25 @@ class task():
         pass
 
     def delete(self):
-        # tasks_delete
-        raise NotImplementedError()
-        pass
+        response = self._session.delete(self.url)
+        response.raise_for_status()
 
-    def get_annotations(self):
+    def get_annotations(self, filepath, format=CVATAPI.ANNOTATIONS.CVATImages1_1):
+        # Download annotations and save them as filename
         # tasks_annotations_read
-        raise NotImplementedError()
+
+        filename = os.path.basename(filepath)
+
+        url = self.url + '/annotations'
+        params = {'format': format.value, 'filename': filename, 'action': 'download'}
+        with self._session.get(url, params=params, stream=True) as r:
+            r.raise_for_status()
+            with open(filepath, 'wb') as f:
+                for chunk in r.iter_content(chunk_size=8192): 
+                    # If you have chunk encoded response uncomment if
+                    # and set chunk_size parameter to None.
+                    #if chunk: 
+                    f.write(chunk)
         pass
 
     def update_annotations(self):

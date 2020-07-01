@@ -7,6 +7,7 @@ import glob
 import json
 import logging
 import os
+import shutil
 import sys
 import time
 from cvatapi import CVATAPI
@@ -24,12 +25,14 @@ def main():
 
     parser_group_local = parser.add_argument_group('Local')
     parser_group_local.add_argument('--local_share', action='store', default='', type=str, help='Path to folder containing subfolders with images. Folder must be shared with and mounted on server. (default: %(default)s)')
+    parser_group_local.add_argument('--completed_postfix', action='store', default='__completed', type=str, help='Ignore local folders with this postfix. (default: %(default)s)')
 
     parser_group_task = parser.add_argument_group('Task')
     parser_group_task.add_argument('--labels', action='store', default='labels.json', type=str, metavar='labels.json', help='Json-file specifying labels. (default: %(default)s)')
     parser_group_task.add_argument('--job_size', action='store', default=0, type=int, help='Number of images in each job in the task. If set to 0, all images are put into a single job. (default: %(default)s, type: %(type)s)')
     parser_group_task.add_argument('--overlap', action='store', default=0, type=int, help='Number of images to overlap between jobs. If set to 0, no image overlap between jobs. (default: %(default)s, type: %(type)s)')
     parser_group_task.add_argument('--image_quality', action='store', default=80, type=int, help='Image quality (0-100) of jpeg images. (default: %(default)s, type: %(type)s)')
+    parser_group_task.add_argument('--clean_up_completed', action='store_true', help='Download annotations of completed tasks to corresponding local folder, rename folder with _completed postfix, and the delete the task from the server.')
 
     parser_group_debug = parser.add_argument_group('Debug')
     parser_group_debug.add_argument('--debug', action='store_true', help='Set flag to print additional debug info.')
@@ -37,7 +40,7 @@ def main():
     # Parse input arguments
     args = parser.parse_args()
 
-    # Setup log
+    # Setup logging
     if (args.debug):
         log_level = logging.DEBUG
     else:
@@ -57,16 +60,6 @@ def main():
 
     # Quick and dirty: Encapsule everything in a try-catch to catch any errors and add them to the log
     try:
-        # Read labels
-        f = open(args.labels)
-        labels = json.load(f)
-        f.close()
-
-        logging.info('Scanning for folders...')
-        logging.info('Main folder: ' + args.local_share)
-        folders = [f for f in os.listdir(args.local_share) if os.path.isdir(os.path.join(args.local_share, f))]
-        logging.info('Found ' + str(len(folders)) + ' folders: ' + ':'.join(folders))
-
         logging.info('Connecting to server (' + args.host +':' +  args.port + ')...')
         cvat = CVATAPI(server_host=args.host, server_port=args.port, username=args.username, password=args.password, use_https=args.https)
 
@@ -75,6 +68,50 @@ def main():
         logging.info('Found ' + str(len(tasks)) + ' task(s) on the server:')
         for task in tasks:
             logging.info(task)
+        task_complete_status = [task.task_status == 'completed' for task in tasks]
+        logging.info(str(sum(task_complete_status)) + '/' + str(len(tasks)) + ' tasks with status "completed".')
+
+        if (args.clean_up_completed) & sum(task_complete_status) > 0:
+            logging.warn('Cleaning up completed tasks...')
+
+            for task in tasks:
+                if task.task_status == 'completed':
+
+                    logging.info('Cleaning up: ' + task.name)
+
+                    # Download annotations (and compressed? Only if local directory does not exist)
+                    logging.info('Downloading annotations...')
+                    local_task_folder = os.path.join(args.local_share, task.name)
+                    os.makedirs(local_task_folder, exist_ok=True)
+                    filepath = os.path.join(local_task_folder, 'annotations.zip')
+                    logging.debug(filepath)
+                    task.get_annotations(filepath, format=CVATAPI.ANNOTATIONS.CVATImages1_1)
+                    
+                    # Rename local directory
+                    logging.info('Rename local folder.')
+                    local_task_folder_new_name = local_task_folder + args.completed_postfix
+                    logging.debug(local_task_folder + ' --> ' + local_task_folder_new_name)
+                    shutil.move(local_task_folder, local_task_folder_new_name)
+                    
+                    # Delete task on server
+                    task.delete()
+
+            logging.info('Retrieving tasks after cleanup...')
+            tasks = cvat.get_tasks()
+            logging.info('Found ' + str(len(tasks)) + ' task(s) on the server:')
+            for task in tasks:
+                logging.info(task)
+
+
+        logging.info('Scanning for folders...')
+        logging.info('Main folder: ' + args.local_share)
+        all_folders = [f for f in os.listdir(args.local_share) if os.path.isdir(os.path.join(args.local_share, f))]
+        logging.info('Found ' + str(len(all_folders)) + ' folders: ' + ':'.join(all_folders))
+
+        folders_completed = [f for f in all_folders if f[-len(args.completed_postfix):] == args.completed_postfix]
+        logging.info('Ignoring ' + str(len(folders_completed)) + '/' + str(len(all_folders)) + ' folders marked as completed.')
+
+        folders = [f for f in all_folders if not f[-len(args.completed_postfix):] == args.completed_postfix]
 
         task_names = [task.name for task in tasks]
 
@@ -86,6 +123,11 @@ def main():
             logging.info('All folders accounted for. No new tasks created.')
         if (len(folders_no_match) > 0):
             logging.info('Creating new tasks for folders with no match...')
+
+            # Read labels
+            f = open(args.labels)
+            labels = json.load(f)
+            f.close()
 
             for folder in folders_no_match:
                 logging.info('Processing folder: ' + folder)
@@ -115,6 +157,8 @@ def main():
                     logging.warning('\033[1;33mState: ' + status['state'] + '. Message: ' + status['message']+'\033[0m')
                 else:
                     logging.info('State: ' + status['state'] + '. Message: ' + status['message'])
+
+                # TODO: Add annotations, if annotations.zip is found in folder
 
         logging.info('Done')
 
