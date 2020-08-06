@@ -12,6 +12,7 @@ class CVATAPI(object):
     def __init__(self, server_host='localhost', server_port='8080', username='', password='', use_https=False):
         self.server_host = server_host
         self.server_port = server_port
+        self.https = use_https
         if (use_https):
             self.base_url = 'https://' + self.server_host + ':' + self.server_port + '/api/v1/'
         else:
@@ -47,7 +48,7 @@ class CVATAPI(object):
         while True:
             response_json = response.json()
             for r in response_json['results']:
-                tasks.append(task(self.session, r))
+                tasks.append(task(self.session, r, use_https=self.https))
             if not response_json['next']:
                 break
             page += 1
@@ -76,7 +77,7 @@ class CVATAPI(object):
         response.raise_for_status()
         response_json = response.json()
 
-        _task = task(self.session, response_json)
+        _task = task(self.session, response_json, use_https=self.https)
 
         if self.tasks is None:
             self.tasks = [_task]
@@ -92,9 +93,11 @@ class CVATAPI(object):
 
 class task():
 
-    def __init__(self, session, json):
+    def __init__(self, session, json, use_https=False):
         self.id = json['id']
         self.url = json['url']
+        if (use_https):
+            self.url = self.url.replace('http://','https://')
         self.name = json['name']
         self.mode = json['mode']
         self.labels = json['labels']
